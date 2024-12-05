@@ -15,7 +15,9 @@ export default function HomeScreen() {
   const [hasPermission, setHasPermission] = React.useState(true);
   const [isCameraRestricted, setIsCameraRestricted] = React.useState(false);
   const [selectedImage, setSelectedImage] = React.useState<string | null>(null);
-  const [zoom, setZoom] = React.useState(device?.maxZoom || 1);
+  const [zoom, setZoom] = React.useState(device?.neutralZoom || 0);
+  const [isRecording, setIsRecording] = React.useState(false);
+  const [willRecord, setWillRecord] = React.useState(false);
   const camera = React.useRef<Camera>(null);
   const devices = useCameraDevices();
   const device = devices.find((d) => d.position === cameraPosition);
@@ -36,6 +38,7 @@ export default function HomeScreen() {
     console.log("Available devices:", devices);
     console.log("Current camera position:", cameraPosition);
     console.log("Device:", device);
+    console.log(device.minZoom, device.maxZoom, device.neutralZoom);
   }, [devices, cameraPosition, device]);
 
   const pickImage = async () => {
@@ -95,6 +98,75 @@ export default function HomeScreen() {
     }
   };
 
+const startRecording = async () => {
+  try {
+    if (camera.current == null) throw new Error("Camera ref is null!");
+
+    console.log("Starting video recording...");
+    await camera.current.startRecording({
+      audio: true, // Enable audio recording
+      onRecordingFinished: (video) => {
+        if (video && video.path) {
+          console.log("Video recording finished:", video);
+          router.push({
+            pathname: "/media",
+            params: { media: video.path, type: "video" },
+          });
+        } else {
+          console.error("Recording finished but video object is undefined or missing path");
+        }
+      },
+      onRecordingError: (error) => {
+        console.error("Recording error:", error);
+      },
+    });
+    setIsRecording(true);
+  } catch (e) {
+    console.error("Failed to start video recording!", e);
+  }
+};
+
+const stopRecording = async () => {
+  try {
+    if (camera.current == null) throw new Error("Camera ref is null!");
+
+    console.log("Stopping video recording...");
+    // Ensure a minimum recording duration
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    const video = await camera.current.stopRecording();
+    setIsRecording(false);
+
+    if (video && video.path) {
+      console.log("Video recording stopped:", video.path);
+      router.push({
+        pathname: "/media",
+        params: { media: video.path, type: "video" },
+      });
+    } else {
+      console.error("Recording stopped but no video data received");
+    }
+  } catch (e) {
+    console.error("Failed to stop recording!", e);
+  }
+};
+
+{/* toggle between taking a photo and recording video*/}
+const toggleCapture = () => {
+    if (willRecord) {
+        setWillRecord(false);
+    } else {
+        setWillRecord(true);
+    }
+
+    {/* pop up about changing modes */}
+    if (willRecord) {
+        console.log("Switching to photo mode...");
+    } else {
+        console.log("Switching to video mode...");
+    }
+}
+
+
   if (isCameraRestricted) {
     return <View style={styles.container}><ThemedText type="title">Camera is restricted by the operating system.</ThemedText></View>;
   }
@@ -106,20 +178,21 @@ export default function HomeScreen() {
     return <View style={styles.container}><ThemedText type="title">Loading camera...</ThemedText></View>;
   }
 
+
   const { width: screenWidth } = Dimensions.get('window');
   const full = screenWidth;
   return (
     <SafeAreaView style={styles.container}>
       <View style={{ flex: 5, borderRadius: 20, overflow: 'hidden'}}>
-        <Camera ref={camera} style={{ flex: 1 }} device={device} isActive={true} zoom={zoom} video={true} photo={true}/>
+        <Camera ref={camera} style={{ flex: 1 }} device={device} isActive={true} zoom={zoom} video={true} photo={true} audio={true}/>
       </View>
       <View style={{ flex: 0.4, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <ThemedText style={{ color: '#FFFFFF', fontSize: 16, marginLeft: 10 }}>
-          {`${(zoom / (device.maxZoom || 1)).toFixed(1)}x`}
+          {`${(zoom).toFixed(1)}x`}
         </ThemedText>
         <Slider
           style={{ width: full - 60, height: 40 }} // Adjust width to fit the screen with some margin
-          minimumValue={0}
+          minimumValue={device.minZoom/ (device.maxZoom || 1)}
           maximumValue={1}
           value={zoom / (device.maxZoom || 1)}
           minimumTrackTintColor="#FFFFFF"
@@ -141,6 +214,11 @@ export default function HomeScreen() {
           containerStyle={{ alignSelf: "center" }}
         />
         <Button
+          iconName={willRecord === true ? "camera-outline" : "videocam-outline"}
+          onPress={toggleCapture}
+          containerStyle={{ alignSelf: "center" }}
+        />
+        <Button
           iconName="settings-outline"
           onPress={() => router.push("/_sitemap")}
           containerStyle={{ alignSelf: "center" }}
@@ -152,7 +230,7 @@ export default function HomeScreen() {
           onPress={pickImage}
           containerStyle={{ alignSelf: "center" }}
         />
-        <TouchableHighlight onPress={takePicture}>
+        <TouchableHighlight onPressIn={willRecord === false ? takePicture: startRecording} onPressOut={willRecord === false ? () => {} : () => camera.current?.stopRecording()}>
                   <FontAwesome5 name="dot-circle" size={80} color={"white"} />
         </TouchableHighlight>
         <Button
