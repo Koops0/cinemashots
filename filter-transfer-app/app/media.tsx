@@ -14,7 +14,6 @@ export default function MediaScreen() {
       const savePhoto = async () => {
         try {
           await saveToLibraryAsync(media as string);
-          Alert.alert("Saved to gallery!");
           router.back();
         } catch (error) {
           Alert.alert("Failed to save photo", error.message);

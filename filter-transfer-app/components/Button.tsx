@@ -56,7 +56,7 @@ export default function Button({
 
 const styles = StyleSheet.create({
   container: {
-    paddingVertical: 10,
+    paddingVertical: 5,
     paddingHorizontal: 50,
     borderRadius: 50,
     flexDirection: "row",

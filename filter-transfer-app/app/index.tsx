@@ -1,18 +1,21 @@
 import * as React from "react";
-import { View, StyleSheet, SafeAreaView, StatusBar, Platform, Linking, TouchableHighlight } from "react-native";
+import { View, StyleSheet, SafeAreaView, StatusBar, Platform, Linking, TouchableHighlight, Dimensions } from "react-native";
 import { Camera, useCameraDevices, useCameraPermission } from "react-native-vision-camera";
 import * as ImagePicker from "react-native-image-picker";
 import * as ExpoMediaLibrary from "expo-media-library";
 import { useRouter } from "expo-router";
 import Button from "@/components/Button";
 import { ThemedText } from "@/components/ThemedText";
+import Slider from "@react-native-community/slider";
 import { FontAwesome5 } from "@expo/vector-icons";
+import CustomThumb from "@/components/Thumb";
 
 export default function HomeScreen() {
   const [cameraPosition, setCameraPosition] = React.useState("back");
   const [hasPermission, setHasPermission] = React.useState(true);
   const [isCameraRestricted, setIsCameraRestricted] = React.useState(false);
   const [selectedImage, setSelectedImage] = React.useState<string | null>(null);
+  const [zoom, setZoom] = React.useState(device?.maxZoom || 1);
   const camera = React.useRef<Camera>(null);
   const devices = useCameraDevices();
   const device = devices.find((d) => d.position === cameraPosition);
@@ -67,6 +70,13 @@ export default function HomeScreen() {
     }
   };
 
+  const zoomChange = (value: number) => {
+    if (device?.maxZoom != null) {
+        const newZoom = value * device.maxZoom;
+        setZoom(newZoom);
+    }
+  }
+
   const takePicture = async () => {
     try {
       if (camera.current == null) throw new Error("Camera ref is null!");
@@ -96,18 +106,28 @@ export default function HomeScreen() {
     return <View style={styles.container}><ThemedText type="title">Loading camera...</ThemedText></View>;
   }
 
+  const { width: screenWidth } = Dimensions.get('window');
+  const full = screenWidth;
   return (
     <SafeAreaView style={styles.container}>
       <View style={{ flex: 5, borderRadius: 20, overflow: 'hidden'}}>
-        <Camera ref={camera} style={{ flex: 1 }} device={device} isActive={true} photo={true}/>
+        <Camera ref={camera} style={{ flex: 1 }} device={device} isActive={true} zoom={zoom} video={true} photo={true}/>
       </View>
-      <View style={{flex: 0.4}}>
-        <Button
-            iconSize={40}
-            title="1x"
-            onPress={() => setShowZoomControls((s) => !s)}
-            containerStyle={{ alignSelf: "center" }}/>
-        </View>
+      <View style={{ flex: 0.4, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <ThemedText style={{ color: '#FFFFFF', fontSize: 16, marginLeft: 10 }}>
+          {`${(zoom / (device.maxZoom || 1)).toFixed(1)}x`}
+        </ThemedText>
+        <Slider
+          style={{ width: full - 60, height: 40 }} // Adjust width to fit the screen with some margin
+          minimumValue={0}
+          maximumValue={1}
+          value={zoom / (device.maxZoom || 1)}
+          minimumTrackTintColor="#FFFFFF"
+          maximumTrackTintColor="#FFFFFF"
+          thumbTintColor="#FFFFFF"
+          onValueChange={zoomChange}
+        />
+      </View>
       <View style={{ flex: 0.3, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
         <Button
           iconName="image-outline"
@@ -133,7 +153,7 @@ export default function HomeScreen() {
           containerStyle={{ alignSelf: "center" }}
         />
         <TouchableHighlight onPress={takePicture}>
-                  <FontAwesome5 name="dot-circle" size={100} color={"white"} />
+                  <FontAwesome5 name="dot-circle" size={80} color={"white"} />
         </TouchableHighlight>
         <Button
           iconName="camera-reverse-outline"
