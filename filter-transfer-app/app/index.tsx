@@ -1,6 +1,6 @@
 import * as React from "react";
 import { View, StyleSheet, SafeAreaView, StatusBar, Platform, Linking, TouchableHighlight, Dimensions } from "react-native";
-import { Camera, useCameraDevices, useCameraPermission } from "react-native-vision-camera";
+import { Camera, useCameraDevices, useCameraPermission, useFrameProcessor} from "react-native-vision-camera";
 import * as ImagePicker from "react-native-image-picker";
 import * as ExpoMediaLibrary from "expo-media-library";
 import { useRouter } from "expo-router";
@@ -9,6 +9,9 @@ import { ThemedText } from "@/components/ThemedText";
 import Slider from "@react-native-community/slider";
 import { FontAwesome5 } from "@expo/vector-icons";
 import CustomThumb from "@/components/Thumb";
+import { Asset } from 'expo-asset';
+import labels from '../assets/labels.json';
+import { TensorFlowModel, useTensorflowModel } from 'react-native-fast-tflite';
 
 export default function HomeScreen() {
   const [cameraPosition, setCameraPosition] = React.useState("back");
@@ -18,6 +21,9 @@ export default function HomeScreen() {
   const [zoom, setZoom] = React.useState(device?.neutralZoom || 0);
   const [isRecording, setIsRecording] = React.useState(false);
   const [willRecord, setWillRecord] = React.useState(false);
+  const [modelUri, setModelUri] = React.useState<string | null>(null);
+  const [loading, setLoading] = React.useState(true);
+
   const camera = React.useRef<Camera>(null);
   const devices = useCameraDevices();
   const device = devices.find((d) => d.position === cameraPosition);
@@ -40,6 +46,9 @@ export default function HomeScreen() {
     console.log("Device:", device);
     console.log(device.minZoom, device.maxZoom, device.neutralZoom);
   }, [devices, cameraPosition, device]);
+
+  // Always initialize the plugin
+  const plugin = useTensorflowModel(require('./assets/imagemodel.tflite'))
 
   const pickImage = async () => {
     try {
@@ -165,7 +174,10 @@ const toggleCapture = () => {
         console.log("Switching to video mode...");
     }
 }
-
+    const frameProcessor = useFrameProcessor((frame) => {
+        'worklet'
+        console.log(`Received a ${frame.width} x ${frame.height} Frame!`)
+     }, [])
 
   if (isCameraRestricted) {
     return <View style={styles.container}><ThemedText type="title">Camera is restricted by the operating system.</ThemedText></View>;
@@ -178,13 +190,12 @@ const toggleCapture = () => {
     return <View style={styles.container}><ThemedText type="title">Loading camera...</ThemedText></View>;
   }
 
-
   const { width: screenWidth } = Dimensions.get('window');
   const full = screenWidth;
   return (
     <SafeAreaView style={styles.container}>
       <View style={{ flex: 5, borderRadius: 20, overflow: 'hidden'}}>
-        <Camera ref={camera} style={{ flex: 1 }} device={device} isActive={true} zoom={zoom} video={true} photo={true} audio={true}/>
+        <Camera ref={camera} style={{ flex: 1 }} device={device} isActive={true} zoom={zoom} video={true} photo={true} audio={true} frameProcessor={frameProcessor}/>
       </View>
       <View style={{ flex: 0.4, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <ThemedText style={{ color: '#FFFFFF', fontSize: 16, marginLeft: 10 }}>
